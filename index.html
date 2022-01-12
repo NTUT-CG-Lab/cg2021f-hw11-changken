@@ -1,0 +1,352 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0'>
+    <style>
+        input[type=file] {
+            display: none;
+        }
+
+        .frostedGlass {
+            border-radius: 20px;
+            overflow: hidden;
+            background-color: rgba(0,0,0,0.8);
+            backdrop-filter: blur(5px)
+        }
+
+        .btnLabel {
+            background-color: lightgray;
+            padding: 8px;
+            margin: 2px;
+            border-radius: 16px;
+            text-align: center;
+            width: calc(33% - 20px);
+            flex: 1 1 auto;
+            user-select: none;
+            -moz-user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .btnLabel:hover {
+            background-color: gray;
+        }
+
+        .controlPanel {
+            max-height: 1000px;
+            display: flex;
+            flex-direction: column;
+            position: absolute;
+            align-items: center;
+            right: 0px;
+            top: 0px;
+        }
+
+        .panelHeader {
+            color: white;
+            text-align: center;
+        }
+
+        #palette {
+            width: 400px;
+            height: 600px;
+            margin: 20px;
+        }
+
+        .saveSpace {
+            width: 100%;
+            height: 20px;
+        }
+
+        #closeBtn {
+            background-color: lightgray;
+            text-align: center;
+            width: 100%;
+            user-select: none;
+            -moz-user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #closeBtn:hover {
+            background-color: darkgray;
+        }
+
+        .settingForm {
+            display: flex;
+            max-width:100%;
+            flex-wrap: wrap;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            justify-content: center;
+        }
+
+        .close {
+            max-height: 0px;
+            overflow: hidden;
+            transform-origin: top;
+            -webkit-transform-origin: top;
+            -moz-transform-origin: top;
+            transition: max-height 0.8s ease-in-out;
+            -webkit-transition: max-height 0.8s ease-in-out;
+            -moz-transition: max-height 0.8s ease-in-out;
+        }
+
+        .open {
+            max-height: 100vh;
+            transform-origin: top;
+            -webkit-transform-origin: top;
+            -moz-transform-origin: top;
+            transition: max-height 0.8s ease-in-out;
+            -webkit-transition: max-height 0.8s ease-in-out;
+            -moz-transition: max-height 0.8s ease-in-out;
+        }
+
+        .noDisplay{
+            display:none
+        }
+
+        .radioSpace {
+            width: 100%;
+            display: flex;
+        }
+
+        .radioSpace label {
+            background-color: lightgrey;
+            border-radius: 5px;
+            margin: 5px;
+            flex: 1 1 0;
+            text-align: center
+        }
+
+    </style>
+</head>
+<body style="padding:0px;margin:0px;width:100vw;height:100vh">
+    <div id="info" style="position:absolute;top:0px; left:0px"></div>
+    <div id="controlPanel" class="controlPanel frostedGlass" data-collapsed="false">
+
+        <!--標題-->
+        <div class="panelHeader saveSpace">Control Panel</div>
+
+        <!--內容-->
+        <div class="panelContent open">
+            <div class="settingForm">
+                <label class="btnLabel noDisplay"><input type="file" name="settingForm" accept=".raw">load .raw</label>
+                <label class="btnLabel noDisplay"><input type="file" name="settingForm" accept=".tf">load .tf</label>
+                <label class="btnLabel noDisplay"><input type="file" name="settingForm" accept=".sbdat">load .sbdat</label>
+                <label class="btnLabel" name="settingForm">sized based</label>
+                <label class="btnLabel noDisplay" name="settingForm">save .tf</label>
+                <label class="btnLabel noDisplay" name="settingForm">save .sbdat</label>
+            </div>
+            <div class=" noDisplay" >
+                <label><input type="radio"name="rtype" value="mips" checked>MIPS</label>
+                <label><input type="radio" name="rtype" value="iso">ISO</label>
+            </div>
+            <div id="palette"></div>
+        </div>
+
+        <!--收合按鈕-->
+        <div id="closeBtn" class="saveSpace">close</div>
+
+    </div>
+    <script src="js/scoreoutputer.min.js"></script>
+    <script>
+        // 建構子 ScoreOutputer 接受一個字串，該字串為 csv 的檔案名稱
+        var so = new ScoreOutputer("109114514");
+        so.installCSS(function () {
+            // 安裝 bootstrap 的 css，如果在 html 上方引用 bootstrap 5.1.1 的話就不用使用 installCSS ，注意一定要 bootstrap css 5.1.1 版
+            // installCSS 接收一個 callback 當作參數，作為成功安裝 bootstrap css 的回呼函式
+
+            //加入項目，分數，完成狀況
+            //第一個參數為 項目名稱
+            //第2個參數為 項目分數
+            //第3個參數為 完成狀況，有完成 true/未完成 false
+            //有幾個項目就呼叫幾個 addChild
+            //addChild 要比 renderModal 先呼叫
+            so.addChild("讀取文件並顯示資訊", 4, true);
+            so.addChild("使用直接法渲染影像", 2, true);
+            so.addChild("使用transfer function渲染影像", 2, true);
+            so.addChild("調色盤變更紋理", 2, false);
+
+            //產生自評表，參數如下所示
+            so.renderModal(
+                //1. 自評表插入位置 (預設 document.body)
+                document.body,
+                //2. 自評表背景 (預設紅色)
+                "rgba(100,45,58,1)",
+                //3. 自評表文字顏色 (預設白色)
+                "white",
+                //4. 自評表文字大小 (預設 14pt)
+                "15pt",
+                //5. 自評表 checkbox 文字大小 (預設多少忘了)
+                "15px",
+                //6. 自評表標題 (預設 "自我評分表")
+                (dialogTitle = "自我評分表")
+            );
+
+            //設定下載按鈕 <-- 一定要呼叫這個函數，不然沒有下載功能
+            so.installDownloadBtn();
+
+            //產生 "開啟自評表按鈕"
+            so.renderBtn(
+                //自評表按鈕插入位置
+                document.querySelector("#info"),
+                //自評表按鈕文字
+                "開啟自評表"
+            );
+        });
+    </script>
+    <script type="module">
+
+        import { ScaleField, Gaussian } from './jsm/scaleField.js'
+        import { threejsViewer } from './jsm/threejsViewer.js'
+        import { ControlView, colorSetting } from './jsm/controlView.js'
+
+        const fileRegex = /(\w+)_(\d+)_(\d+)_(\d+)_(\w+)\.*/;
+
+        let field, controlView, modelView
+        let arg = new colorSetting()
+
+        let getColormap = function () {
+            let color = new Uint8ClampedArray(256 * 4)
+            for (let i = 0; i < 256; i++) {
+                color[4 * i] = arg.rgba[0][i] * 255
+                color[4 * i + 1] = arg.rgba[1][i] * 255
+                color[4 * i + 2] = arg.rgba[2][i] * 255
+                color[4 * i + 3] = arg.rgba[3][i] * 255
+            }
+
+            return color
+        }
+
+        let getMinMax = function (dataBuffer) {
+            if (dataBuffer.length <= 0) {
+                return { min: 0, max: 0 }
+            }
+            else if (dataBuffer.length == 1) {
+                return { min: dataBuffer[0], max: dataBuffer[0] }
+            }
+
+            let min = dataBuffer[0]
+            let max = dataBuffer[0]
+            for (let i = 0; i < dataBuffer.length; i++) {
+                if (dataBuffer[i] > max) {
+                    max = dataBuffer[i]
+                }
+                if (dataBuffer[i] < min) {
+                    min = dataBuffer[i]
+                }
+            }
+
+            return { min: min, max: max }
+        }
+
+        let loadLocalRawFile = (path, onload) => {
+            let xhr = new XMLHttpRequest()
+            xhr.responseType = 'arraybuffer'
+            xhr.open('GET', path)
+            xhr.onreadystatechange = () => {
+                if (xhr.readyState == 4) {
+                    if (xhr.status == 200) {
+                        onload(xhr.response)
+                    }
+                }
+            }
+            xhr.send()
+        }
+
+        function bitConvertor(dataType, raw) {
+            let dataBuffer
+
+            // 位元轉換
+            if (dataType == 'uint8') {
+                dataBuffer = new Uint8ClampedArray(raw)
+
+                let cmpSize = getMinMax(dataBuffer)
+                let min = cmpSize.min
+                let max = cmpSize.max
+
+                for (let i = 0; i < dataBuffer.length; i++) {
+                    dataBuffer[i] = (dataBuffer[i] - min) / (max - min) * 255
+                }
+            }
+            else if (dataType == 'uint16') {
+
+                // uint16 -> 16 bits -> 2 bytes: 取byteLength/2作為陣列長度
+                let data_16 = new Uint16Array(raw.byteLength / 2)
+
+                // 不同硬體對資料的處理方式分為big endian/little endian
+                // 使用dataView處理該問題
+                let dv = new DataView(raw)
+
+                for (let i = 0; i < data_16.length; i++) {
+                    data_16[i] = dv.getUint16(i * 2, false) // i * 2: 2 * i bytes
+                }
+
+                // 按比例縮放數值
+                let cmpSize = getMinMax(data_16)
+                let min = cmpSize.min
+                let max = cmpSize.max
+
+                for (let i = 0; i < data_16.length; i++) {
+                    data_16[i] = (data_16[i] - min) / (max - min) * 255
+                }
+
+                // 使用Uint8ClampedArray處理超過8bits(>256)的值
+                dataBuffer = new Uint8ClampedArray(data_16)
+            }
+            else {
+                dataBuffer = new Uint8ClampedArray(raw)
+            }
+
+            return dataBuffer
+        }
+
+        function init() {
+
+            // 收合按鈕:點擊事件設置
+            let closeBtn = document.getElementById('closeBtn')
+            let controlPanel = document.getElementById('controlPanel')
+            let content = controlPanel.getElementsByClassName('panelContent')[0]
+            closeBtn.addEventListener('click', function (evt) {
+                evt.preventDefault()
+
+                if (controlPanel.dataset.collapsed == 'true') {
+                    content.classList.remove('close')
+                    content.classList.add('open')
+                    controlPanel.dataset.collapsed = false
+                }
+                else {
+                    content.classList.add('close')
+                    content.classList.remove('open')
+                    controlPanel.dataset.collapsed = true
+                }
+            })
+
+            let elements = document.getElementsByName('settingForm')
+
+            // 執行Sizebased transfer function
+            elements[3].addEventListener('click', (evt) => {})
+
+            // 預設以ISO渲染
+            arg.renderType = 1
+
+            // RAW文件讀取
+            loadLocalRawFile('./raw/CTchest_64_64_64_uint8.raw', (result) => {
+
+            })
+
+        }
+
+        window.onload = () => {
+            modelView = new threejsViewer(document.body)
+            controlView = new ControlView(document.getElementById('palette'), arg)
+
+            //當調色盤的參數變更時，觸發事件
+            controlView.addEventListener('change', () => {})
+
+            init()
+        }
+    </script>
+
+</body>
+</html>
