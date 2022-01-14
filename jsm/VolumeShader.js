@@ -86,13 +86,15 @@ const VolumeRenderShader1 = {
 
 				void cast_mip(vec3 start_loc, vec3 step, int nsteps, vec3 view_ray);
 				void cast_iso(vec3 start_loc, vec3 step, int nsteps, vec3 view_ray);
+				void cast_iso_size(vec3 start_loc, vec3 step, int nsteps, vec3 view_ray);
 
 				float sample1(vec3 texcoords);
 				float sample2(vec3 texcoords);
 
 				vec4 apply_colormap(float val);
-				vec4 add_lighting(float val, vec3 loc, vec3 step, vec3 view_ray);
-
+				vec4 add_lighting(float val, vec3 loc, vec3 step, vec3 view_ray, vec4 color);
+				vec4 getColor(float scalar);
+				vec4 getColor_size(float scalar, float size);
 
 				void main() {
 						// Normalize clipping plane info
@@ -132,8 +134,10 @@ const VolumeRenderShader1 = {
 
 						if (u_renderstyle == 0)
 								cast_mip(start_loc, step, nsteps, view_ray);
-						else if (u_renderstyle == 1)
+						else if (u_renderstyle == 1 && u_sizeEnable == 0)
 								cast_iso(start_loc, step, nsteps, view_ray);
+						else if (u_renderstyle == 1 && u_sizeEnable == 1)
+								cast_iso_size(start_loc, step, nsteps, view_ray);
 
 						if (gl_FragColor.a < 0.05)
 								discard;
@@ -151,10 +155,24 @@ const VolumeRenderShader1 = {
 				}
 
 				vec4 apply_colormap(float val) {
-						val = (val - u_clim[0]) / (u_clim[1] - u_clim[0]);
+						//val = (val - u_clim[0]) / (u_clim[1] - u_clim[0]);
 						return texture2D(u_cmdata, vec2(val, 0.5));
 				}
 
+				vec4 getColor(float scalar){
+						vec4 tempAlpha = texture2D(u_cmdata, vec2(scalar, 0.5));
+
+						tempAlpha.rgb  = tempAlpha.rgb * tempAlpha.a;
+
+						return tempAlpha;
+				}
+
+				vec4 getColor_size(float scalar, float size){
+						vec4 tempAlpha = texture2D(u_cmdata, vec2(scalar, 0.5));
+						vec4 tempColor = texture2D(u_cmdata, vec2(size, 0.5));
+
+						return tempColor * tempAlpha.a ;
+				}
 
 				void cast_mip(vec3 start_loc, vec3 step, int nsteps, vec3 view_ray) {
 
@@ -199,6 +217,8 @@ const VolumeRenderShader1 = {
 						vec4 color3 = vec4(0.0);	// final color
 						vec3 dstep = 1.5 / u_size;	// step to sample derivative
 						vec3 loc = start_loc;
+						vec4 acc_color = vec4(0.0);
+						vec3 istep = step / float(REFINEMENT_STEPS);
 
 						float low_threshold = u_renderthreshold - 0.02 * (u_clim[1] - u_clim[0]);
 
@@ -213,27 +233,80 @@ const VolumeRenderShader1 = {
 								float val = sample1(loc);
 
 								if (val > low_threshold) {
+
 										// Take the last interval in smaller steps
 										vec3 iloc = loc - 0.5 * step;
-										vec3 istep = step / float(REFINEMENT_STEPS);
+										
 										for (int i=0; i<REFINEMENT_STEPS; i++) {
-												float val = sample1(iloc);												
-												if (val > u_renderthreshold) {
+												float val = sample1(iloc);
+												vec4 sampleColor = getColor(val);		
 
-														gl_FragColor = add_lighting(val, iloc, dstep, view_ray);
-														return;
+												if(sampleColor.a > 0.08){
+													acc_color += (1.0 - acc_color.a) * add_lighting(val, iloc, dstep, view_ray, sampleColor);
 												}
+
 												iloc += istep;
+										}
+								}
+
+								if(acc_color.a > 1.0){
+									gl_FragColor = acc_color;
+									return;
+								}
+
+								// Advance location deeper into the volume
+								loc += step;
+						}
+						gl_FragColor = acc_color;
+				}
+
+				void cast_iso_size(vec3 start_loc, vec3 step, int nsteps, vec3 view_ray) {
+
+						gl_FragColor = vec4(0.0);	// init transparent
+						vec4 color3 = vec4(0.0);	// final color
+						vec3 dstep = 1.5 / u_size;	// step to sample derivative
+						vec3 loc = start_loc;
+						vec4 acc_color = vec4(0.0);
+						vec3 istep = step / float(REFINEMENT_STEPS);
+
+						float low_threshold = u_renderthreshold - 0.02 * (u_clim[1] - u_clim[0]);
+
+						// Enter the raycasting loop. In WebGL 1 the loop index cannot be compared with
+						// non-constant expression. So we use a hard-coded max, and an additional condition
+						// inside the loop.
+						for (int iter=0; iter<MAX_STEPS; iter++) {
+								if (iter >= nsteps)
+										break;
+
+								// Sample from the 3D texture
+								float val = sample1(loc);
+
+								if (val > low_threshold) {
+
+										// Take the last interval in smaller steps
+										vec3 iloc = loc - 0.5 * step;
+										
+										for (int i=0; i<REFINEMENT_STEPS; i++) {
+												float val = sample1(iloc);
+												float val2 = sample2(iloc);
+												vec4 sampleColor = getColor_size(val, val2);		
+
+												if(sampleColor.a > 0.08){											
+													acc_color += (1.0 - acc_color.a) * add_lighting(val, iloc, dstep, view_ray, sampleColor);
+												}
+										
 										}
 								}
 
 								// Advance location deeper into the volume
 								loc += step;
 						}
+						gl_FragColor = acc_color;
 				}
 
+			
 
-				vec4 add_lighting(float val, vec3 loc, vec3 step, vec3 view_ray)
+				vec4 add_lighting(float val, vec3 loc, vec3 step, vec3 view_ray, vec4 color)
 				{
 					// Calculate color by incorporating lighting
 
@@ -246,14 +319,17 @@ const VolumeRenderShader1 = {
 						val1 = sample1(loc + vec3(-step[0], 0.0, 0.0));
 						val2 = sample1(loc + vec3(+step[0], 0.0, 0.0));
 						N[0] = val1 - val2;
+
 						val = max(max(val1, val2), val);
 						val1 = sample1(loc + vec3(0.0, -step[1], 0.0));
 						val2 = sample1(loc + vec3(0.0, +step[1], 0.0));
 						N[1] = val1 - val2;
+
 						val = max(max(val1, val2), val);
 						val1 = sample1(loc + vec3(0.0, 0.0, -step[2]));
 						val2 = sample1(loc + vec3(0.0, 0.0, +step[2]));
 						N[2] = val1 - val2;
+
 						val = max(max(val1, val2), val);
 
 						float gm = length(N); // gradient magnitude
@@ -264,9 +340,9 @@ const VolumeRenderShader1 = {
 						N = (2.0 * Nselect - 1.0) * N;	// ==	Nselect * N - (1.0-Nselect)*N;
 
 						// Init colors
-						vec4 ambient_color = vec4(0.0, 0.0, 0.0, 0.0);
-						vec4 diffuse_color = vec4(0.0, 0.0, 0.0, 0.0);
-						vec4 specular_color = vec4(0.0, 0.0, 0.0, 0.0);
+						vec4 ambient_color = vec4(0.0);
+						vec4 diffuse_color = vec4(0.0);
+						vec4 specular_color = vec4(0.0);
 
 						// note: could allow multiple lights
 						for (int i=0; i<1; i++)
@@ -290,22 +366,9 @@ const VolumeRenderShader1 = {
 								specular_color += mask1 * specularTerm * specular_color;
 						}
 
-						// Calculate final color by componing different components
-						vec4 final_color;
-						vec4 color = apply_colormap(val);
-
-						if(u_sizeEnable == 1)
-						{
-							float size      = sample2(loc);
-							vec4 tempColor = apply_colormap(size);
-
-							tempColor.rgb  = tempColor.rgb * color.a;
-							tempColor.a = tempColor.a * color.a;
-							color =  tempColor.rgba;
-						}
-						
-						final_color = color * (ambient_color + diffuse_color) + specular_color;
+						vec4 final_color = color * (ambient_color + diffuse_color) + specular_color;
 						final_color.a = color.a;
+
 						return final_color;
 				}`
 
