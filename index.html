@@ -336,9 +336,15 @@
 
         // 執行Sizebased transfer function
         elements[3].addEventListener('click', evt => {
-          field.process(null, () => {
-            modelView.renderVolume(field, getColormap(), arg);
-          });
+          field.process(
+            () => {
+              console.log('onprocess');
+            },
+            () => {
+              console.log('onload');
+              modelView.renderVolume(field, getColormap(), arg);
+            }
+          );
         });
 
         // 預設以ISO渲染

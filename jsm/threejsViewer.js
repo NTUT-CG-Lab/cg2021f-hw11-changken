@@ -179,7 +179,7 @@ class threejsViewer {
 
       if (volume.used) {
         uniforms = mesh.material.uniforms;
-        if (uniforms['u_sizeEnable'] === 0) {
+        if (uniforms['u_sizeEnable'].value === 0) {
           //initialize: first time used
           let texture = new THREE.DataTexture3D(
             volume.alpha,
